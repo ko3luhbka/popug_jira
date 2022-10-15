@@ -18,7 +18,7 @@ var (
 		Consumer:   false,
 		Producer:   true,
 		ReadTopic:  "",
-		WriteTopic: mq.UsersTopic,
+		WriteTopic: mq.UsersCUDTopic,
 	}
 )
 

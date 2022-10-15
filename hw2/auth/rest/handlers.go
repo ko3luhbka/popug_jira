@@ -30,7 +30,7 @@ func (s Server) createUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
 
-	e := &mq.Event{
+	e := &mq.UserEvent{
 		Name: mq.UserCreatedEvent,
 		Data: model.EntityToAssignee(created),
 	}
@@ -80,7 +80,7 @@ func (s Server) updateUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
 
-	e := &mq.Event{
+	e := &mq.UserEvent{
 		Name: mq.UserUpdatedEvent,
 		Data: model.EntityToAssignee(updated),
 	}
@@ -100,9 +100,9 @@ func (s Server) deleteUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
 
-	e := &mq.Event{
+	e := &mq.UserEvent{
 		Name: mq.UserDeletedEvent,
-		Data: model.Assignee{
+		Data: &model.Assignee{
 			ID: id,
 		},
 	}

@@ -6,15 +6,17 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/ko3luhbka/auth/rest/model"
 	"github.com/segmentio/kafka-go"
 )
 
 const (
 	kafkaHost        = "localhost:29092"
-	UsersTopic       = "users"
-	UserCreatedEvent = "user_created"
-	UserUpdatedEvent = "user_updated"
-	UserDeletedEvent = "user_deleted"
+
+	UsersCUDTopic       = "usersStreaming"
+	UserCreatedEvent = "userCreated"
+	UserUpdatedEvent = "userUpdated"
+	UserDeletedEvent = "userDeleted"
 )
 
 type (
@@ -29,9 +31,9 @@ type (
 		reader *kafka.Reader
 		writer *kafka.Writer
 	}
-	Event struct {
+	UserEvent struct {
 		Name string `json:"name"`
-		Data any    `json:"data"`
+		Data *model.Assignee    `json:"data"`
 	}
 )
 
@@ -45,7 +47,6 @@ func NewMQClient(cfg *Config) *Client {
 			MinBytes:  10e3, // 10KB
 			MaxBytes:  10e6, // 10MB
 		})
-		// r.SetOffset(42)
 		client.reader = reader
 	}
 
@@ -61,7 +62,7 @@ func NewMQClient(cfg *Config) *Client {
 	return &client
 }
 
-func (c *Client) Produce(ctx context.Context, e *Event) error {
+func (c *Client) Produce(ctx context.Context, e *UserEvent) error {
 	msgValue, err := json.Marshal(e)
 	if err != nil {
 		return fmt.Errorf("failed to marshal Kafka event: %v", err)

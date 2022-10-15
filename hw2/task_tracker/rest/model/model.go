@@ -19,7 +19,18 @@ type (
 		AssigneeID  string    `json:"assignee_id"`
 		Created     time.Time `json:"created"`
 	}
+	TaskInfo struct {
+		ID          string    `json:"id"`
+		AssigneeID  string    `json:"assignee_id"`
+	}
 )
+
+func (u *UserInfo) ToEntity() *db.Assignee {
+	return &db.Assignee{
+		ID: u.ID,
+		Username: u.Username,
+	}
+}
 
 func (t *Task) Validate() error {
 	if t.Name == "" {
@@ -55,3 +66,7 @@ func (m *Task) FromEntity(e *db.Task) {
 	m.AssigneeID = e.AssigneeID
 	m.Created = e.Created
 }
+
+// func (m *Task) ToTaskInfo() *TaskInfo {
+
+// }

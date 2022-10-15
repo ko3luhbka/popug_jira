@@ -18,9 +18,9 @@ const (
 var (
 	mqCfg = &mq.Config{
 		Consumer:   true,
-		Producer:   false,
-		ReadTopic:  mq.UsersTopic,
-		WriteTopic: "",
+		Producer:   true,
+		ReadTopic:  mq.UsersCUDTopic,
+		WriteTopic: mq.TasksCUDTopic,
 	}
 )
 
