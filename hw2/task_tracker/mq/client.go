@@ -14,9 +14,10 @@ const (
 	UserUpdatedEvent = "userUpdated"
 	UserDeletedEvent = "userDeleted"
 
-	TasksCUDTopic        = "tasksStreaming"
+	TasksTopic           = "tasks"
 	TaskAssignedEvent    = "taskAssigned"
 	TasksReassignedEvent = "tasksReassigned"
+	TaskCompleted        = "taskCompleted"
 )
 
 type (
@@ -32,11 +33,11 @@ type (
 		Writer *kafka.Writer
 	}
 	UserEvent struct {
-		Name string      `json:"name"`
+		Name string         `json:"name"`
 		Data model.UserInfo `json:"data"`
 	}
 	TaskEvent struct {
-		Name string      `json:"name"`
+		Name string         `json:"name"`
 		Data model.TaskInfo `json:"data"`
 	}
 )
@@ -56,9 +57,9 @@ func NewMQClient(cfg *Config) *Client {
 
 	if cfg.Producer {
 		w := &kafka.Writer{
-			Addr:     kafka.TCP(kafkaHost),
-			Topic:    cfg.WriteTopic,
-			Balancer: &kafka.LeastBytes{},
+			Addr:                   kafka.TCP(kafkaHost),
+			Topic:                  cfg.WriteTopic,
+			Balancer:               &kafka.LeastBytes{},
 			AllowAutoTopicCreation: true,
 		}
 		client.Writer = w

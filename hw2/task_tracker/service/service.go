@@ -18,14 +18,14 @@ import (
 type Service struct {
 	taskRepo     *db.TaskRepo
 	assigneeRepo *db.AssigneeRepo
-	Mq *mq.Client
+	Mq           *mq.Client
 }
 
 func NewService(tr *db.TaskRepo, ar *db.AssigneeRepo, mq *mq.Client) *Service {
 	return &Service{
-		taskRepo: tr,
+		taskRepo:     tr,
 		assigneeRepo: ar,
-		Mq: mq,
+		Mq:           mq,
 	}
 }
 
@@ -35,6 +35,7 @@ func (s Service) CreateTask(ctx context.Context, t model.Task) (*db.Task, error)
 		return nil, err
 	}
 	t.AssigneeID = assignee.ID
+	t.Status = model.TaskStatusAssigned
 
 	created, err := s.taskRepo.Create(ctx, *t.ToEntity())
 	if err != nil {
@@ -43,10 +44,7 @@ func (s Service) CreateTask(ctx context.Context, t model.Task) (*db.Task, error)
 
 	e := mq.TaskEvent{
 		Name: mq.TaskAssignedEvent,
-		Data: model.TaskInfo{
-			ID: created.ID,
-			AssigneeID: assignee.ID,
-		},
+		Data: *model.TaskEntityToTaskInfo(created),
 	}
 	if err := s.ProduceMsg(ctx, e); err != nil {
 		return nil, err
@@ -76,6 +74,16 @@ func (s Service) UpdateTask(ctx context.Context, t model.Task) (*db.Task, error)
 	updated, err := s.taskRepo.Update(ctx, *t.ToEntity())
 	if err != nil {
 		return nil, err
+	}
+
+	if updated.Status == model.TaskStatusCompleted {
+		e := mq.TaskEvent{
+			Name: mq.TaskCompleted,
+			Data: *model.TaskEntityToTaskInfo(updated),
+		}
+		if err := s.ProduceMsg(ctx, e); err != nil {
+			return nil, err
+		}
 	}
 	return updated, nil
 }
@@ -111,7 +119,7 @@ func (s Service) ReassignTasks(ctx context.Context) error {
 		reassignedTaskEvents[i] = mq.TaskEvent{
 			Name: mq.TasksReassignedEvent,
 			Data: model.TaskInfo{
-				ID: updated.ID,
+				ID:         updated.ID,
 				AssigneeID: assignee.ID,
 			},
 		}
@@ -180,7 +188,6 @@ func (s Service) ProduceMsg(ctx context.Context, e ...mq.TaskEvent) error {
 	}
 	return nil
 }
-
 
 func (s Service) handleEvent(ctx context.Context, msg *kafka.Message) error {
 	var e mq.UserEvent
