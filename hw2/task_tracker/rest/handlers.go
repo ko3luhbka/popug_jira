@@ -19,7 +19,7 @@ func (s Server) createTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
 	}
 
-	if err := t.Validate(); err != nil {
+	if err := t.ValidateCreate(); err != nil {
 		log.Printf("invalid task: %v\n", err)
 		return c.Status(fiber.StatusUnprocessableEntity).SendString(err.Error())
 	}
@@ -64,9 +64,10 @@ func (s Server) updateTask(c *fiber.Ctx) error {
 		log.Printf("failed to parse body: %v\n", err)
 		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
 	}
+	if err := t.ValidateUpdate(); err != nil {
+		return c.Status(fiber.StatusUnprocessableEntity).SendString(err.Error())
+	}
 	t.ID = uuid
-
-	t.RemoveAssignee()
 
 	updated, err := s.Svc.UpdateTask(c.Context(), t)
 	if err != nil {

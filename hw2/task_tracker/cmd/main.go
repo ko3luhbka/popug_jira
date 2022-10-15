@@ -20,7 +20,7 @@ var (
 		Consumer:   true,
 		Producer:   true,
 		ReadTopic:  mq.UsersCUDTopic,
-		WriteTopic: mq.TasksCUDTopic,
+		WriteTopic: mq.TasksTopic,
 	}
 )
 

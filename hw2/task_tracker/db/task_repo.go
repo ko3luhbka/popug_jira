@@ -18,6 +18,7 @@ type (
 		ID          string    `db:"id"`
 		Name        string    `db:"name"`
 		Description string    `db:"description"`
+		Status      string    `db:"status"`
 		AssigneeID  string    `db:"assignee_id"`
 		Created     time.Time `db:"created"`
 	}
@@ -35,16 +36,19 @@ func (r *TaskRepo) Create(ctx context.Context, t Task) (*Task, error) {
 		INSERT INTO task(
 				name,
 				description,
+				status,
 				assignee_id,
 				created)
 		VALUES(:name,
 				:description,
+				:status,
 				:assignee_id,
 				CURRENT_TIMESTAMP)
 		RETURNING
 				id,
 				name,
 				description,
+				status,
 				assignee_id,
 				created`,
 	)
@@ -67,6 +71,7 @@ func (r *TaskRepo) GetByID(ctx context.Context, uuid string) (*Task, error) {
 		SELECT  id,
 				name,
 				description,
+				status,
 				assignee_id,
 				created
 		FROM task
@@ -86,6 +91,7 @@ func (r *TaskRepo) GetAll(ctx context.Context) ([]Task, error) {
 		SELECT 	id,
 				name,
 				description,
+				status,
 				assignee_id,
 				created
 		FROM task`,
@@ -121,6 +127,9 @@ func buildTaskUpdateQuery(t *Task) string {
 	if t.Description != "" {
 		queryBuilder.WriteString(`description=:description, `)
 	}
+	if t.Status != "" {
+		queryBuilder.WriteString(`status=:status, `)
+	}
 	if t.AssigneeID != "" {
 		queryBuilder.WriteString(`assignee_id=:assignee_id, `)
 	}
@@ -130,6 +139,7 @@ func buildTaskUpdateQuery(t *Task) string {
 		id,
 		name,
 		description,
+		status,
 		assignee_id,
 		created`)
 	return queryBuilder.String()
