@@ -40,6 +40,18 @@ func (s Service) CreateTask(ctx context.Context, t model.Task) (*db.Task, error)
 	if err != nil {
 		return nil, err
 	}
+
+	e := mq.TaskEvent{
+		Name: mq.TaskAssignedEvent,
+		Data: model.TaskInfo{
+			ID: created.ID,
+			AssigneeID: assignee.ID,
+		},
+	}
+	if err := s.ProduceMsg(ctx, e); err != nil {
+		return nil, err
+	}
+
 	return created, nil
 }
 
@@ -73,8 +85,6 @@ func (s Service) DeleteTask(ctx context.Context, uuid string) error {
 }
 
 func (s Service) ReassignTasks(ctx context.Context) error {
-	
-
 	tasks, err := s.taskRepo.GetAll(ctx)
 	if err != nil {
 		return err
@@ -86,17 +96,29 @@ func (s Service) ReassignTasks(ctx context.Context) error {
 		return err
 	}
 
-	for _, task := range tasks {
+	reassignedTaskEvents := make([]mq.TaskEvent, len(tasks))
+	for i, task := range tasks {
 		assignee, err := s.getRandomAssignee(ctx)
 		if err != nil {
 			return err
 		}
 		task.AssigneeID = assignee.ID
-		_, err = s.taskRepo.Update(ctx, task)
+		updated, err := s.taskRepo.Update(ctx, task)
 		if err != nil {
 			err = fmt.Errorf("failed to reassign task %s: %v", task.ID, err)
 			return err
 		}
+		reassignedTaskEvents[i] = mq.TaskEvent{
+			Name: mq.TasksReassignedEvent,
+			Data: model.TaskInfo{
+				ID: updated.ID,
+				AssigneeID: assignee.ID,
+			},
+		}
+	}
+
+	if err := s.ProduceMsg(ctx, reassignedTaskEvents...); err != nil {
+		return err
 	}
 
 	return nil
@@ -130,21 +152,20 @@ func (s Service) ConsumeMsg(errCh chan error) {
 		}()
 
 		for {
-			m, err := s.Mq.Reader.ReadMessage(context.Background())
-			if err != nil {
-				err = fmt.Errorf("failed to read message from topic: %v", err)
-				log.Println(err)
-				return
-			}
 			ctx := context.Background()
+			m, err := s.Mq.Reader.ReadMessage(ctx)
+			log.Printf("message at offset %d: %s = %s\n", m.Offset, string(m.Key), string(m.Value))
+			if err != nil {
+				log.Println(fmt.Errorf("failed to read message from topic: %v", err))
+			}
 			if err := s.handleEvent(ctx, &m); err != nil {
-				log.Printf("failed to handle event: %v", err)
+				log.Println(fmt.Errorf("failed to handle event: %v", err))
 			}
 		}
 	}(errCh)
 }
 
-func (s Service) ProduceMsg(ctx context.Context, e *mq.UserEvent) error {
+func (s Service) ProduceMsg(ctx context.Context, e ...mq.TaskEvent) error {
 	msgValue, err := json.Marshal(e)
 	if err != nil {
 		return fmt.Errorf("failed to marshal Kafka event: %v", err)
@@ -162,8 +183,6 @@ func (s Service) ProduceMsg(ctx context.Context, e *mq.UserEvent) error {
 
 
 func (s Service) handleEvent(ctx context.Context, msg *kafka.Message) error {
-	log.Printf("message at offset %d: %s = %s\n", msg.Offset, string(msg.Key), string(msg.Value))
-
 	var e mq.UserEvent
 	if err := json.Unmarshal(msg.Value, &e); err != nil {
 		return err
@@ -171,12 +190,12 @@ func (s Service) handleEvent(ctx context.Context, msg *kafka.Message) error {
 
 	switch e.Name {
 	case mq.UserCreatedEvent:
-		_, err := s.assigneeRepo.Create(ctx, e.Data)
+		_, err := s.assigneeRepo.Create(ctx, *e.Data.ToEntity())
 		if err != nil {
 			return fmt.Errorf("failed to create incoming assignee: %v", err)
 		}
 	case mq.UserUpdatedEvent:
-		_, err := s.assigneeRepo.Update(ctx, e.Data)
+		_, err := s.assigneeRepo.Update(ctx, *e.Data.ToEntity())
 		if err != nil {
 			return fmt.Errorf("failed to update incoming assignee: %v", err)
 		}
