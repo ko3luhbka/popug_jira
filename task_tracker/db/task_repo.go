@@ -16,7 +16,7 @@ type (
 	}
 	Task struct {
 		ID          string    `db:"id"`
-		Name        string    `db:"name"`
+		Title       string    `db:"title"`
 		Description string    `db:"description"`
 		Status      string    `db:"status"`
 		AssigneeID  string    `db:"assignee_id"`
@@ -34,19 +34,19 @@ func (r *TaskRepo) Create(ctx context.Context, t Task) (*Task, error) {
 	stmt, err := r.db.PrepareNamedContext(ctx,
 		`
 		INSERT INTO task(
-				name,
+				title,
 				description,
 				status,
 				assignee_id,
 				created)
-		VALUES(:name,
+		VALUES(:title,
 				:description,
 				:status,
 				:assignee_id,
 				CURRENT_TIMESTAMP)
 		RETURNING
 				id,
-				name,
+				title,
 				description,
 				status,
 				assignee_id,
@@ -69,7 +69,7 @@ func (r *TaskRepo) GetByID(ctx context.Context, uuid string) (*Task, error) {
 	err := r.db.GetContext(
 		ctx, &t, `
 		SELECT  id,
-				name,
+				title,
 				description,
 				status,
 				assignee_id,
@@ -89,7 +89,7 @@ func (r *TaskRepo) GetAll(ctx context.Context) ([]Task, error) {
 	err := r.db.SelectContext(
 		ctx, &tasks, `
 		SELECT 	id,
-				name,
+				title,
 				description,
 				status,
 				assignee_id,
@@ -121,8 +121,8 @@ func buildTaskUpdateQuery(t *Task) string {
 	var queryBuilder strings.Builder
 
 	queryBuilder.WriteString(`UPDATE task SET `)
-	if t.Name != "" {
-		queryBuilder.WriteString(`name=:name, `)
+	if t.Title != "" {
+		queryBuilder.WriteString(`title=:title, `)
 	}
 	if t.Description != "" {
 		queryBuilder.WriteString(`description=:description, `)
@@ -137,7 +137,7 @@ func buildTaskUpdateQuery(t *Task) string {
 	queryBuilder.WriteString(`WHERE id=:id `)
 	queryBuilder.WriteString(`RETURNING 
 		id,
-		name,
+		title,
 		description,
 		status,
 		assignee_id,

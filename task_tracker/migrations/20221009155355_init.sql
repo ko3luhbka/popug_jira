@@ -7,7 +7,7 @@ CREATE TABLE assignee (
 
 CREATE TABLE task (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    name varchar NOT NULL UNIQUE,
+    title varchar NOT NULL UNIQUE,
     description text NOT NULL,
     status varchar NOT NULL DEFAULT '',
     assignee_id uuid REFERENCES assignee (id),

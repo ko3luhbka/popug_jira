@@ -19,7 +19,7 @@ type (
 	}
 	Task struct {
 		ID          string    `json:"id"`
-		Name        string    `json:"name"`
+		Title       string    `json:"title"`
 		Description string    `json:"description"`
 		Status      string    `json:"status"`
 		AssigneeID  string    `json:"assignee_id"`
@@ -27,6 +27,7 @@ type (
 	}
 	TaskInfo struct {
 		ID         string `json:"id"`
+		Title      string `json:"title"`
 		AssigneeID string `json:"assignee_id"`
 	}
 )
@@ -39,8 +40,8 @@ func (u *UserInfo) ToEntity() *db.Assignee {
 }
 
 func (t *Task) ValidateCreate() error {
-	if t.Name == "" {
-		return fmt.Errorf("name field is empty")
+	if t.Title == "" {
+		return fmt.Errorf("title field is empty")
 	}
 	if t.Description == "" {
 		return fmt.Errorf("description field is empty")
@@ -67,7 +68,7 @@ func (t *Task) RemoveAssignee() {
 func (m *Task) ToEntity() *db.Task {
 	return &db.Task{
 		ID:          m.ID,
-		Name:        m.Name,
+		Title:       m.Title,
 		Description: m.Description,
 		Status:      m.Status,
 		AssigneeID:  m.AssigneeID,
@@ -77,7 +78,7 @@ func (m *Task) ToEntity() *db.Task {
 
 func (m *Task) FromEntity(e *db.Task) {
 	m.ID = e.ID
-	m.Name = e.Name
+	m.Title = e.Title
 	m.Description = e.Description
 	m.Status = e.Status
 	m.AssigneeID = e.AssigneeID
@@ -87,6 +88,7 @@ func (m *Task) FromEntity(e *db.Task) {
 func TaskEntityToTaskInfo(e *db.Task) *TaskInfo {
 	return &TaskInfo{
 		ID:         e.ID,
+		Title:      e.Title,
 		AssigneeID: e.AssigneeID,
 	}
 }
