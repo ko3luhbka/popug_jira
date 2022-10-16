@@ -17,6 +17,7 @@ type (
 	Task struct {
 		ID          string    `db:"id"`
 		Title       string    `db:"title"`
+		JiraID      string    `db:"jira_id"`
 		Description string    `db:"description"`
 		Status      string    `db:"status"`
 		AssigneeID  string    `db:"assignee_id"`
@@ -35,11 +36,13 @@ func (r *TaskRepo) Create(ctx context.Context, t Task) (*Task, error) {
 		`
 		INSERT INTO task(
 				title,
+				jira_id,
 				description,
 				status,
 				assignee_id,
 				created)
 		VALUES(:title,
+				:jira_id,
 				:description,
 				:status,
 				:assignee_id,
@@ -47,6 +50,7 @@ func (r *TaskRepo) Create(ctx context.Context, t Task) (*Task, error) {
 		RETURNING
 				id,
 				title,
+				jira_id,
 				description,
 				status,
 				assignee_id,
@@ -70,6 +74,7 @@ func (r *TaskRepo) GetByID(ctx context.Context, uuid string) (*Task, error) {
 		ctx, &t, `
 		SELECT  id,
 				title,
+				jira_id,
 				description,
 				status,
 				assignee_id,
@@ -90,6 +95,7 @@ func (r *TaskRepo) GetAll(ctx context.Context) ([]Task, error) {
 		ctx, &tasks, `
 		SELECT 	id,
 				title,
+				jira_id,
 				description,
 				status,
 				assignee_id,
@@ -123,6 +129,9 @@ func buildTaskUpdateQuery(t *Task) string {
 	queryBuilder.WriteString(`UPDATE task SET `)
 	if t.Title != "" {
 		queryBuilder.WriteString(`title=:title, `)
+	}
+	if t.JiraID != "" {
+		queryBuilder.WriteString(`jira_id=:jira_id, `)
 	}
 	if t.Description != "" {
 		queryBuilder.WriteString(`description=:description, `)
