@@ -15,7 +15,7 @@ const (
 type Server struct {
 	mq   *mq.Client
 	repo *db.Repo
-	app *fiber.App
+	app  *fiber.App
 }
 
 func NewServer(repo *db.Repo, mq *mq.Client) (*Server, error) {
