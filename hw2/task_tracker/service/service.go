@@ -29,7 +29,7 @@ func NewService(tr *db.TaskRepo, ar *db.AssigneeRepo, mq *mq.Client) *Service {
 	}
 }
 
-func (s Service) CreateTask(ctx context.Context, t model.Task) (*db.Task, error) {
+func (s Service) CreateTask(ctx context.Context, t model.Task) (*model.Task, error) {
 	assignee, err := s.getRandomAssignee(ctx)
 	if err != nil {
 		return nil, err
@@ -50,26 +50,38 @@ func (s Service) CreateTask(ctx context.Context, t model.Task) (*db.Task, error)
 		return nil, err
 	}
 
-	return created, nil
+	m := new(model.Task)
+	m.FromEntity(created)
+	return m, nil
 }
 
-func (s Service) GetTaskByID(ctx context.Context, uuid string) (*db.Task, error) {
+func (s Service) GetTaskByID(ctx context.Context, uuid string) (*model.Task, error) {
 	task, err := s.taskRepo.GetByID(ctx, uuid)
 	if err != nil {
 		return nil, err
 	}
-	return task, nil
+
+	m := new(model.Task)
+	m.FromEntity(task)
+	return m, nil
 }
 
-func (s Service) GetAllTasks(ctx context.Context) ([]db.Task, error) {
+func (s Service) GetAllTasks(ctx context.Context) ([]model.Task, error) {
 	tasks, err := s.taskRepo.GetAll(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return tasks, nil
+
+	tasksModel := make([]model.Task, len(tasks))
+	for i, task := range tasks {
+		m := new(model.Task)
+		m.FromEntity(&task)
+		tasksModel[i] = *m
+	}
+	return tasksModel, nil
 }
 
-func (s Service) UpdateTask(ctx context.Context, t model.Task) (*db.Task, error) {
+func (s Service) UpdateTask(ctx context.Context, t model.Task) (*model.Task, error) {
 	t.RemoveAssignee()
 	updated, err := s.taskRepo.Update(ctx, *t.ToEntity())
 	if err != nil {
@@ -85,7 +97,10 @@ func (s Service) UpdateTask(ctx context.Context, t model.Task) (*db.Task, error)
 			return nil, err
 		}
 	}
-	return updated, nil
+
+	m := new(model.Task)
+	m.FromEntity(updated)
+	return m, nil
 }
 
 func (s Service) DeleteTask(ctx context.Context, uuid string) error {
@@ -117,7 +132,7 @@ func (s Service) ReassignTasks(ctx context.Context) error {
 			return err
 		}
 		reassignedTaskEvents[i] = mq.TaskEvent{
-			Name: mq.TasksReassignedEvent,
+			Name: mq.TaskAssignedEvent,
 			Data: model.TaskInfo{
 				ID:         updated.ID,
 				AssigneeID: assignee.ID,
@@ -173,17 +188,21 @@ func (s Service) ConsumeMsg(errCh chan error) {
 	}(errCh)
 }
 
-func (s Service) ProduceMsg(ctx context.Context, e ...mq.TaskEvent) error {
-	msgValue, err := json.Marshal(e)
-	if err != nil {
-		return fmt.Errorf("failed to marshal Kafka event: %v", err)
-	}
-	msg := kafka.Message{
-		Key:   nil,
-		Value: msgValue,
+func (s Service) ProduceMsg(ctx context.Context, events ...mq.TaskEvent) error {
+	msgs := make([]kafka.Message, len(events))
+	for i, e := range events {
+		msgValue, err := json.Marshal(e)
+		if err != nil {
+			return fmt.Errorf("failed to marshal Kafka event: %v", err)
+		}
+		msg := kafka.Message{
+			Key:   nil,
+			Value: msgValue,
+		}
+		msgs[i] = msg
 	}
 
-	if err := s.Mq.Writer.WriteMessages(ctx, msg); err != nil {
+	if err := s.Mq.Writer.WriteMessages(ctx, msgs...); err != nil {
 		log.Fatal("failed to write message:", err)
 	}
 	return nil

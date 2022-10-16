@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	kafkaHost        = "localhost:29092"
+	kafkaHost = "localhost:29092"
 
-	UsersCUDTopic       = "usersStreaming"
+	UsersCUDTopic    = "usersStreaming"
 	UserCreatedEvent = "userCreated"
 	UserUpdatedEvent = "userUpdated"
 	UserDeletedEvent = "userDeleted"
@@ -32,8 +32,8 @@ type (
 		writer *kafka.Writer
 	}
 	UserEvent struct {
-		Name string `json:"name"`
-		Data *model.Assignee    `json:"data"`
+		Name string          `json:"name"`
+		Data *model.Assignee `json:"data"`
 	}
 )
 
@@ -44,17 +44,18 @@ func NewMQClient(cfg *Config) *Client {
 			Brokers:   []string{kafkaHost},
 			Topic:     cfg.ReadTopic,
 			Partition: 0,
-			MinBytes:  10e3, // 10KB
-			MaxBytes:  10e6, // 10MB
+			MinBytes:  1,
+			MaxBytes:  10e6,
 		})
 		client.reader = reader
 	}
 
 	if cfg.Producer {
 		w := &kafka.Writer{
-			Addr:     kafka.TCP(kafkaHost),
-			Topic:    cfg.WriteTopic,
-			Balancer: &kafka.LeastBytes{},
+			Addr:         kafka.TCP(kafkaHost),
+			Topic:        cfg.WriteTopic,
+			Balancer:     &kafka.LeastBytes{},
+			RequiredAcks: 1,
 		}
 		client.writer = w
 	}

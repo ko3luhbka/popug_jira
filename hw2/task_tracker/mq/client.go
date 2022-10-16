@@ -7,7 +7,7 @@ import (
 
 const (
 	kafkaHost = "localhost:29092"
-	GroupID   = "consumerGroup1"
+	GroupID   = "usersConsumer"
 
 	UsersCUDTopic    = "usersStreaming"
 	UserCreatedEvent = "userCreated"
@@ -49,8 +49,8 @@ func NewMQClient(cfg *Config) *Client {
 			Brokers:  []string{kafkaHost},
 			Topic:    cfg.ReadTopic,
 			GroupID:  GroupID,
-			MinBytes: 10e3, // 10KB
-			MaxBytes: 10e6, // 10MB
+			MinBytes: 1,
+			MaxBytes: 10e6,
 		})
 		client.Reader = reader
 	}
@@ -61,6 +61,7 @@ func NewMQClient(cfg *Config) *Client {
 			Topic:                  cfg.WriteTopic,
 			Balancer:               &kafka.LeastBytes{},
 			AllowAutoTopicCreation: true,
+			RequiredAcks:           1,
 		}
 		client.Writer = w
 	}
