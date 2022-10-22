@@ -2,7 +2,6 @@ package model
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/ko3luhbka/task_tracker/db"
@@ -45,9 +44,6 @@ func (u *UserInfo) ToEntity() *db.Assignee {
 func (t *Task) ValidateCreate() error {
 	if t.Title == "" {
 		return fmt.Errorf("title field is empty")
-	}
-	if strings.ContainsAny(t.Title, "[]") {
-		return fmt.Errorf("title should not contain jira_id")
 	}
 	if t.Description == "" {
 		return fmt.Errorf("description field is empty")

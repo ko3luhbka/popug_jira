@@ -1,0 +1,57 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    
+    "title": "Task.Event.v2",
+    "description": "JSON Schema TaskEvent (version 2)",
+  
+    "type": "object",
+  
+    "properties": {
+      "name": {
+        "enum": [
+          "taskAssigned",
+          "taskCompleted"
+        ],
+      "description": "event name"
+      },
+      "version": {
+        "enum": [2]
+      },
+      "data": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "task UUID"
+          },
+          "title": {
+            "type": "string",
+            "description": "task title",
+            "pattern": "^[^\\[\\]]+$",
+            "minLength": 1
+          },
+          "jira_id": {
+            "type": "string",
+            "description": "jira task id",
+            "minLength": 1
+          },
+          "assignee_id": {
+            "type": "string",
+            "description": "UUID of user the task is assigned to"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "jira_id",
+          "assignee_id"
+        ]
+      }
+    },
+    "required": [
+      "name",
+      "version"
+    ]
+  }
+  

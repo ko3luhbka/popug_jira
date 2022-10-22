@@ -11,7 +11,7 @@ type (
 		ID       string `json:"id"`
 		Username string `json:"username"`
 	}
-	TaskInfo struct {
+		TaskInfo struct {
 		ID         string `json:"id"`
 		Title      string `json:"title"`
 		JiraID     string `json:"jira_id"`

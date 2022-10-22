@@ -9,11 +9,14 @@ import (
 	"time"
 
 	"github.com/segmentio/kafka-go"
+	"github.com/ko3luhbka/popug_schema_registry/validator"
 
 	"github.com/ko3luhbka/accounting/db"
 	"github.com/ko3luhbka/accounting/mq"
 	"github.com/ko3luhbka/accounting/rest/model"
 )
+
+const taskSchemaType = "task"
 
 type Service struct {
 	accountRepo *db.AccountRepo
@@ -161,6 +164,10 @@ func (s Service) handleTaskEvents(ctx context.Context, msg *kafka.Message) error
 	var e mq.TaskEvent
 	if err := json.Unmarshal(msg.Value, &e); err != nil {
 		return err
+	}
+
+	if err := validator.Validate(e, taskSchemaType, 2); err != nil {
+		return fmt.Errorf("invalid event: %v", err)
 	}
 
 	user := e.Data.AssigneeID
