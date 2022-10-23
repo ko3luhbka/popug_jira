@@ -20,6 +20,10 @@ type (
 		Debit      int       `db:"debit"`
 		Created    time.Time `db:"created"`
 	}
+	AssigneeBalance struct {
+		AssigneeID string `db:"assignee_id"`
+		Balance    int    `db:"balance"`
+	}
 )
 
 func NewAccountRepo(db *sqlx.DB) *AccountRepo {
@@ -72,6 +76,22 @@ func (r *AccountRepo) GetUserBalance(ctx context.Context, uuid string) (balance 
 		return 0, err
 	}
 	return balance, nil
+}
+
+func (r *AccountRepo) GetUsersBalances(ctx context.Context) ([]AssigneeBalance, error) {
+	var balances []AssigneeBalance
+	err := r.db.SelectContext(
+		ctx, &balances,
+		`SELECT assignee_id, coalesce(SUM(credit) + SUM(debit), 0) AS balance
+		FROM account
+		WHERE created::date = now()::date
+		GROUP BY assignee_id`,
+	)
+	if err != nil {
+		log.Printf("failed to get users' balances: %v\n", err)
+		return nil, err
+	}
+	return balances, nil
 }
 
 func (r *AccountRepo) GetManagementTodayIncome(ctx context.Context) (income int, err error) {

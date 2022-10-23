@@ -12,7 +12,7 @@ CREATE TABLE audit (
     id SERIAL PRIMARY KEY,
     event_name varchar NOT NULL,
     assignee_id uuid,
-    task_id uuid,
+    task_id varchar,
     task_title varchar,
     amount int,
     created timestamp NOT NULL

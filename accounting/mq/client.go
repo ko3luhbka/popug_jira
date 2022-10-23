@@ -35,9 +35,9 @@ type (
 		Data model.UserInfo `json:"data"`
 	}
 	TaskEvent struct {
-		Name string         `json:"name"`
-		Version int `json:"version"`
-		Data model.TaskInfo `json:"data"`
+		Name    string         `json:"name"`
+		Version int            `json:"version"`
+		Data    model.TaskInfo `json:"data"`
 	}
 )
 

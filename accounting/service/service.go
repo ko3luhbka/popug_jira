@@ -8,15 +8,18 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/segmentio/kafka-go"
 	"github.com/ko3luhbka/popug_schema_registry/validator"
+	"github.com/segmentio/kafka-go"
 
 	"github.com/ko3luhbka/accounting/db"
 	"github.com/ko3luhbka/accounting/mq"
 	"github.com/ko3luhbka/accounting/rest/model"
 )
 
-const taskSchemaType = "task"
+const (
+	taskSchemaType    = "task"
+	endOfDayTimestamp = "18:00"
+)
 
 type Service struct {
 	accountRepo *db.AccountRepo
@@ -32,12 +35,74 @@ func NewService(accr *db.AccountRepo, audr *db.AuditRepo, mq *mq.Client) *Servic
 	}
 }
 
+func (s Service) RunWorkdayTimer(ctx context.Context, done chan bool) error {
+	const timeLayout = "15:04"
+	untilTime, err := time.Parse(timeLayout, endOfDayTimestamp)
+	if err != nil {
+		return err
+	}
+	ticker := time.NewTicker(time.Minute)
+
+	go func() {
+		for {
+			select {
+			case <-done:
+				ticker.Stop()
+				return
+			case tick := <-ticker.C:
+				if tick.Hour() == untilTime.Hour() && tick.Minute() == untilTime.Minute() {
+					log.Printf("workday is over")
+					if err := s.FinishWorkday(ctx); err != nil {
+						log.Println("failed to run end of day routine")
+					}
+				}
+			}
+		}
+	}()
+	return nil
+}
+
 func (s Service) GetUserBalance(ctx context.Context, userUUID string) (int, error) {
 	balance, err := s.accountRepo.GetUserBalance(ctx, userUUID)
 	if err != nil {
 		return 0, err
 	}
 	return balance, nil
+}
+
+func (s Service) FinishWorkday(ctx context.Context) error {
+	balances, err := s.accountRepo.GetUsersBalances(ctx)
+	if err != nil {
+		return err
+	}
+	for _, usrBalance := range balances {
+		user := usrBalance.AssigneeID
+		balance := usrBalance.Balance
+		if err := s.SendPayoutMailToUser(user, balance); err != nil {
+			return err
+		}
+		audit := &db.Audit{
+			EventName:  "endOfDayPayment",
+			AssigneeID: user,
+			Amount:     balance,
+		}
+		_, err := s.auditRepo.Create(ctx, audit)
+		if err != nil {
+			return err
+		}
+
+		// zero user's balance by deleting all account table records
+		if err := s.accountRepo.DeleteByUser(ctx, user); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s Service) SendPayoutMailToUser(uuid string, balance int) error {
+	// TODO: letter body creation & sending logic
+	log.Printf("payout letter is sent to user %s", uuid)
+	return nil
 }
 
 func (s Service) DeleteUserAccount(ctx context.Context, uuid string) error {

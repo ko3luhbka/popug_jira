@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
@@ -48,19 +49,24 @@ func main() {
 	errCh := make(chan error)
 	srv.Run(errCh)
 	srv.Svc.ConsumeMsg(errCh)
+	done := make(chan bool)
 
+	if err := srv.Svc.RunWorkdayTimer(context.Background(), done); err != nil {
+		log.Fatal(err)
+	}
 	exitCh := make(chan os.Signal, 1)
 	signal.Notify(exitCh, os.Interrupt)
 
 	select {
 	case <-exitCh:
-		shutdown(srv)
+		shutdown(srv, done)
 	case <-errCh:
-		shutdown(srv)
+		shutdown(srv, done)
 	}
 }
 
-func shutdown(srv *rest.Server) {
+func shutdown(srv *rest.Server, done chan bool) {
+	done <- true
 	if err := srv.Shutdown(); err != nil {
 		log.Println(err)
 	}
