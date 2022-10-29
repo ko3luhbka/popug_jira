@@ -1,29 +1,28 @@
 package mq
 
 import (
-	"github.com/ko3luhbka/task_tracker/rest/model"
+	"github.com/ko3luhbka/accounting/rest/model"
 	"github.com/segmentio/kafka-go"
 )
 
 const (
 	kafkaHost = "localhost:29092"
-	GroupID   = "usersConsumer"
+	GroupID   = "accountingConsumer"
 
 	UsersCUDTopic    = "usersStreaming"
-	UserCreatedEvent = "userCreated"
-	UserUpdatedEvent = "userUpdated"
 	UserDeletedEvent = "userDeleted"
 
-	TasksTopic        = "tasks"
-	TaskAssignedEvent = "taskAssigned"
-	TaskCompleted     = "taskCompleted"
+	TasksTopic           = "tasks"
+	TaskAssignedEvent    = "taskAssigned"
+	TasksReassignedEvent = "tasksReassigned"
+	TaskCompletedEvent   = "taskCompleted"
 )
 
 type (
 	Config struct {
 		Consumer   bool
 		Producer   bool
-		ReadTopic  string
+		ReadTopics []string
 		WriteTopic string
 	}
 	Client struct {
@@ -46,24 +45,13 @@ func NewMQClient(cfg *Config) *Client {
 	var client Client
 	if cfg.Consumer {
 		reader := kafka.NewReader(kafka.ReaderConfig{
-			Brokers:  []string{kafkaHost},
-			Topic:    cfg.ReadTopic,
-			GroupID:  GroupID,
-			MinBytes: 1,
-			MaxBytes: 10e6,
+			Brokers:     []string{kafkaHost},
+			GroupTopics: cfg.ReadTopics,
+			GroupID:     GroupID,
+			MinBytes:    1,
+			MaxBytes:    10e6,
 		})
 		client.Reader = reader
-	}
-
-	if cfg.Producer {
-		w := &kafka.Writer{
-			Addr:                   kafka.TCP(kafkaHost),
-			Topic:                  cfg.WriteTopic,
-			Balancer:               &kafka.LeastBytes{},
-			AllowAutoTopicCreation: true,
-			RequiredAcks:           1,
-		}
-		client.Writer = w
 	}
 
 	return &client

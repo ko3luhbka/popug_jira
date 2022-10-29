@@ -20,6 +20,7 @@ type (
 	Task struct {
 		ID          string    `json:"id"`
 		Title       string    `json:"title"`
+		JiraID      string    `json:"jira_id"`
 		Description string    `json:"description"`
 		Status      string    `json:"status"`
 		AssigneeID  string    `json:"assignee_id"`
@@ -28,6 +29,7 @@ type (
 	TaskInfo struct {
 		ID         string `json:"id"`
 		Title      string `json:"title"`
+		JiraID     string `json:"jira_id"`
 		AssigneeID string `json:"assignee_id"`
 	}
 )
@@ -69,6 +71,7 @@ func (m *Task) ToEntity() *db.Task {
 	return &db.Task{
 		ID:          m.ID,
 		Title:       m.Title,
+		JiraID:      m.JiraID,
 		Description: m.Description,
 		Status:      m.Status,
 		AssigneeID:  m.AssigneeID,
@@ -79,6 +82,7 @@ func (m *Task) ToEntity() *db.Task {
 func (m *Task) FromEntity(e *db.Task) {
 	m.ID = e.ID
 	m.Title = e.Title
+	m.JiraID = e.JiraID
 	m.Description = e.Description
 	m.Status = e.Status
 	m.AssigneeID = e.AssigneeID
@@ -89,6 +93,7 @@ func TaskEntityToTaskInfo(e *db.Task) *TaskInfo {
 	return &TaskInfo{
 		ID:         e.ID,
 		Title:      e.Title,
+		JiraID:     e.JiraID,
 		AssigneeID: e.AssigneeID,
 	}
 }

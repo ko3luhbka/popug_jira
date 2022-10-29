@@ -8,12 +8,15 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/ko3luhbka/popug_schema_registry/validator"
 	"github.com/segmentio/kafka-go"
 
 	"github.com/ko3luhbka/task_tracker/db"
 	"github.com/ko3luhbka/task_tracker/mq"
 	"github.com/ko3luhbka/task_tracker/rest/model"
 )
+
+const taskSchemaType = "task"
 
 type Service struct {
 	taskRepo     *db.TaskRepo
@@ -43,8 +46,9 @@ func (s Service) CreateTask(ctx context.Context, t model.Task) (*model.Task, err
 	}
 
 	e := mq.TaskEvent{
-		Name: mq.TaskAssignedEvent,
-		Data: *model.TaskEntityToTaskInfo(created),
+		Name:    mq.TaskAssignedEvent,
+		Version: 2,
+		Data:    *model.TaskEntityToTaskInfo(created),
 	}
 	if err := s.ProduceMsg(ctx, e); err != nil {
 		return nil, err
@@ -90,8 +94,9 @@ func (s Service) UpdateTask(ctx context.Context, t model.Task) (*model.Task, err
 
 	if updated.Status == model.TaskStatusCompleted {
 		e := mq.TaskEvent{
-			Name: mq.TaskCompleted,
-			Data: *model.TaskEntityToTaskInfo(updated),
+			Name:    mq.TaskCompleted,
+			Version: 2,
+			Data:    *model.TaskEntityToTaskInfo(updated),
 		}
 		if err := s.ProduceMsg(ctx, e); err != nil {
 			return nil, err
@@ -132,9 +137,12 @@ func (s Service) ReassignTasks(ctx context.Context) error {
 			return err
 		}
 		reassignedTaskEvents[i] = mq.TaskEvent{
-			Name: mq.TaskAssignedEvent,
+			Name:    mq.TaskAssignedEvent,
+			Version: 2,
 			Data: model.TaskInfo{
 				ID:         updated.ID,
+				Title:      updated.Title,
+				JiraID:     updated.JiraID,
 				AssigneeID: assignee.ID,
 			},
 		}
@@ -189,8 +197,15 @@ func (s Service) ConsumeMsg(errCh chan error) {
 }
 
 func (s Service) ProduceMsg(ctx context.Context, events ...mq.TaskEvent) error {
+
 	msgs := make([]kafka.Message, len(events))
 	for i, e := range events {
+		if err := validator.Validate(e, taskSchemaType, 2); err != nil {
+			log.Println(err)
+			return fmt.Errorf("invalid event: %v", err)
+
+		}
+
 		msgValue, err := json.Marshal(e)
 		if err != nil {
 			return fmt.Errorf("failed to marshal Kafka event: %v", err)
