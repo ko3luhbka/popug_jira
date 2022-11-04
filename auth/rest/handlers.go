@@ -228,8 +228,11 @@ func (s Server) authorizationGrant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	templateData := map[string]any{
-		"title":    "Authorization grant",
-		"auth_url": fmt.Sprintf("/oauth/authorize?%s", queryStr),
+		"title":     "Authorization grant",
+		"auth_url":  fmt.Sprintf("/oauth/authorize?%s", queryStr),
+		"login_url": fmt.Sprintf("/login"),
+		"app_id":    r.URL.Query().Get("client_id"),
+		"scope":     r.URL.Query().Get("scope"),
 	}
 	tmpl, err := template.ParseFiles("views/auth_grant.html")
 	if err != nil {
