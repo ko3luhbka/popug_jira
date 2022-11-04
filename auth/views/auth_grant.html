@@ -7,10 +7,16 @@
 
   <body>
     <h1>{{.title}}</h1>
-    <p>The client would like to perform actions on your behalf.</p>
+    <p>The client with ID {{.app_id}} would like to perform actions on your behalf.</p>
+    <p>It requires access to your {{.scope}}</p>
     <form id="allow" method="POST" action="{{.auth_url}}">
       <br><br>    
-      <input type="submit" name="log" id="log" value="Allow">       
+      <input type="submit" name="log" id="log" value="Allow">
+      <br><br> 
+    </form>
+    <form id="deny" method="GET" action="{{.login_url}}">
+      <br><br>    
+      <input type="submit" name="log" id="log" value="Deny">
       <br><br> 
     </form>
   </body>
