@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{{.title}}</title>
+  </head>
+
+  <body>
+    <h1>{{.title}}</h1>
+    <p>The client would like to perform actions on your behalf.</p>
+    <form id="allow" method="POST" action="{{.auth_url}}">
+      <br><br>    
+      <input type="submit" name="log" id="log" value="Allow">       
+      <br><br> 
+    </form>
+  </body>
+</html>

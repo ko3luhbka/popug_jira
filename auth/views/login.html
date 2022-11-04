@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{{.title}}</title>
+  </head>
+
+  <body>
+    <h1>{{.title}}</h1>
+
+    {{.error}}
+
+    <form id="login" method="POST" action="{{.login_url}}">
+        <label><b>User Name     
+        </b>    
+        </label>    
+        <input type="text" name="username" placeholder="Username">    
+        <br><br>    
+        <label><b>Password     
+        </b>    
+        </label>    
+        <input type="Password" name="password" placeholder="Password">    
+        <br><br>    
+        <input type="submit" name="log" id="log" value="Log In Here">       
+        <br><br>    
+        <input type="checkbox" id="check">    
+        <span>Remember me</span>    
+        <br><br>    
+        Forgot <a href="#">Password</a>    
+    </form>
+
+  </body>
+</html>

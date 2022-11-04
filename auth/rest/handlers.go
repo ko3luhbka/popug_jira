@@ -1,128 +1,320 @@
 package rest
 
 import (
+	"encoding/json"
 	"fmt"
+	"html/template"
+	"io"
 	"log"
+	"net/http"
+	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/ko3luhbka/auth/mq"
 	"github.com/ko3luhbka/auth/rest/model"
 )
 
-func (s Server) ping(c *fiber.Ctx) error {
-	return c.Status(fiber.StatusOK).JSON("pong")
+const sessionUserID = "LoggedInUserID"
+
+func (s Server) pingHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "pong")
 }
 
-func (s Server) createUser(c *fiber.Ctx) error {
+func (s Server) createUser(w http.ResponseWriter, r *http.Request) {
 	var u model.User
-	if err := c.BodyParser(&u); err != nil {
-		log.Printf("failed to parse body: %v\n", err)
-		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := json.Unmarshal(body, &u); err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	if err := u.Validate(); err != nil {
 		log.Printf("invalid user: %v\n", err)
-		return c.Status(fiber.StatusUnprocessableEntity).SendString(err.Error())
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
 	}
 
-	created, err := s.repo.Create(c.Context(), *u.ToEntity())
+	created, err := s.repo.Create(r.Context(), *u.ToEntity())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	e := &mq.UserEvent{
 		Name: mq.UserCreatedEvent,
 		Data: model.EntityToAssignee(created),
 	}
-	if err := s.mq.Produce(c.Context(), e); err != nil {
+	if err := s.mq.Produce(r.Context(), e); err != nil {
 		log.Println(err)
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(created)
+	m := model.User{}
+	m.FromEntity(created)
+	writeJSONResponse(m, w)
 }
 
-func (s Server) getAllUsers(c *fiber.Ctx) error {
-	users, err := s.repo.GetAll(c.UserContext())
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-	return c.Status(fiber.StatusOK).JSON(users)
-}
+func (s Server) getUser(w http.ResponseWriter, r *http.Request) {
+	uuid := parseUUID(r)
 
-func (s Server) getUser(c *fiber.Ctx) error {
-	id, err := s.parseID(c)
+	u, err := s.repo.GetByID(r.Context(), uuid)
 	if err != nil {
 		log.Println(err)
-		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	u, err := s.repo.GetByID(c.UserContext(), id)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-	return c.Status(fiber.StatusOK).JSON(u)
+
+	m := model.User{}
+	m.FromEntity(u)
+	writeJSONResponse(m, w)
 }
 
-func (s Server) updateUser(c *fiber.Ctx) error {
+func (s Server) getAllUsera(w http.ResponseWriter, r *http.Request) {
+	entities, err := s.repo.GetAll(r.Context())
+	if err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	models := make([]model.User, len(entities))
+	for i, u := range entities {
+		m := model.User{}
+		m.FromEntity(&u)
+		models[i] = m
+	}
+	writeJSONResponse(models, w)
+}
+
+func (s Server) updateUser(w http.ResponseWriter, r *http.Request) {
+	uuid := parseUUID(r)
+
 	var u model.User
-	uuid, err := s.parseID(c)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Println(err)
-		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	if err := c.BodyParser(&u); err != nil {
-		log.Printf("failed to parse body: %v\n", err)
-		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
+
+	if err := json.Unmarshal(body, &u); err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 	u.ID = uuid
 
-	updated, err := s.repo.Update(c.Context(), *u.ToEntity())
+	updated, err := s.repo.Update(r.Context(), *u.ToEntity())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	e := &mq.UserEvent{
-		Name: mq.UserUpdatedEvent,
+		Name: mq.UserCreatedEvent,
 		Data: model.EntityToAssignee(updated),
 	}
-	if err := s.mq.Produce(c.Context(), e); err != nil {
+	if err := s.mq.Produce(r.Context(), e); err != nil {
 		log.Println(err)
 	}
-	return c.Status(fiber.StatusOK).JSON(updated)
+
+	m := model.User{}
+	m.FromEntity(updated)
+	writeJSONResponse(m, w)
 }
 
-func (s Server) deleteUser(c *fiber.Ctx) error {
-	id, err := s.parseID(c)
-	if err != nil {
+func (s Server) deleteUser(w http.ResponseWriter, r *http.Request) {
+	uuid := parseUUID(r)
+
+	if err := s.repo.Delete(r.Context(), uuid); err != nil {
 		log.Println(err)
-		return c.Status(fiber.StatusBadRequest).SendString(err.Error())
-	}
-	if err := s.repo.Delete(c.Context(), id); err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	e := &mq.UserEvent{
 		Name: mq.UserDeletedEvent,
 		Data: &model.Assignee{
-			ID: id,
+			ID: uuid,
 		},
 	}
-	if err := s.mq.Produce(c.Context(), e); err != nil {
+	if err := s.mq.Produce(r.Context(), e); err != nil {
 		log.Println(err)
 	}
 
-	return c.SendStatus(fiber.StatusOK)
+	w.WriteHeader(http.StatusNoContent)
+	return
 }
 
-// func (s Server) authUser(c *fiber.Ctx) error {
-// TODO
-// }
-
-func (s Server) parseID(ctx *fiber.Ctx) (string, error) {
-	idParam := ctx.Params("id")
-	if idParam == "" {
-		err := fmt.Errorf("user id is empty")
-		log.Println(err)
-		return "", err
+func (s Server) loginUser(w http.ResponseWriter, r *http.Request) {
+	var queryPart string
+	rawQuery := r.URL.RawQuery
+	if rawQuery != "" {
+		queryPart = fmt.Sprintf("?%s", rawQuery)
 	}
-	return idParam, nil
+
+	templateData := map[string]any{
+		"title":     "Popug Jira login page",
+		"login_url": fmt.Sprintf("/login%s", queryPart),
+	}
+	tmpl, err := template.ParseFiles("views/login.html")
+
+	if r.Method == http.MethodGet {
+		if err != nil {
+			log.Println(err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		tmpl.Execute(w, templateData)
+		return
+
+	} else if r.Method == http.MethodPost {
+		if err := r.ParseForm(); err != nil {
+			log.Println(err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		v := r.PostForm
+		var ul model.UserLogin
+		ul.Username = v.Get("username")
+		ul.Password = v.Get("password")
+		if err := ul.Validate(); err != nil {
+			log.Println(err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		user, err := s.repo.GetByName(r.Context(), ul.Username)
+		if err != nil {
+			templateData["error"] = "invalid username or password"
+			tmpl.Execute(w, templateData)
+			return
+		}
+
+		if user.Password != ul.Password {
+			templateData["error"] = "invalid username or password"
+			tmpl.Execute(w, templateData)
+			return
+		}
+
+		sessionMgr.Put(r.Context(), sessionUserID, user.ID)
+
+		oauthURL := fmt.Sprintf("http://localhost:8080/oauth/authorization-grant%s", queryPart)
+		w.Header().Set("Location", oauthURL)
+		w.WriteHeader(http.StatusFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusMethodNotAllowed)
+	return
+}
+
+func (s Server) authorizationGrant(w http.ResponseWriter, r *http.Request) {
+	queryStr := r.URL.RawQuery
+	if userID := sessionMgr.GetString(r.Context(), sessionUserID); userID == "" {
+		w.Header().Set("Location", fmt.Sprintf("/login?%s", queryStr))
+		w.WriteHeader(http.StatusFound)
+		return
+	}
+
+	templateData := map[string]any{
+		"title":    "Authorization grant",
+		"auth_url": fmt.Sprintf("/oauth/authorize?%s", queryStr),
+	}
+	tmpl, err := template.ParseFiles("views/auth_grant.html")
+	if err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	tmpl.Execute(w, templateData)
+	return
+}
+
+func (s Server) authorize(w http.ResponseWriter, r *http.Request) {
+	if err := s.oauth.HandleAuthorizeRequest(w, r); err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+}
+
+func (s Server) getToken(w http.ResponseWriter, r *http.Request) {
+	if err := s.oauth.HandleTokenRequest(w, r); err != nil {
+		log.Println(err)
+	}
+}
+
+func (s Server) validateToken(w http.ResponseWriter, r *http.Request) {
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	token := string(b)
+	if token == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("empty token"))
+		return
+	}
+
+	token = strings.TrimSpace(token)
+	claims := &CustomJwtClaims{}
+	t, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+	if err != nil {
+		if err == jwt.ErrSignatureInvalid {
+			log.Println("invalid jwt token signature")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		log.Printf("failed to parse jwt token: %v\n", err)
+
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if !t.Valid {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	resp, err := json.Marshal(claims)
+	if err != nil {
+		log.Printf("failed to marshal jwt claims: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(resp)
+}
+
+func parseUUID(r *http.Request) string {
+	splittedPath := strings.Split(r.URL.Path, "/")
+	return splittedPath[len(splittedPath)-1]
+}
+
+func writeJSONResponse(model any, w http.ResponseWriter) {
+	resp, err := json.Marshal(model)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(resp)
+	return
 }

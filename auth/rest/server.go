@@ -1,36 +1,39 @@
 package rest
 
 import (
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/alexedwards/scs/v2"
+	"github.com/go-oauth2/oauth2/v4/server"
+
 	"github.com/ko3luhbka/auth/db"
 	"github.com/ko3luhbka/auth/mq"
 )
 
 const (
 	listenAddr = "0.0.0.0:8080"
-	baseURL    = "/"
 )
 
+var sessionMgr = scs.New()
+
 type Server struct {
-	mq   *mq.Client
-	repo *db.Repo
-	app  *fiber.App
+	mq    *mq.Client
+	repo  *db.Repo
+	oauth *server.Server
+	mux   *http.ServeMux
 }
 
 func NewServer(repo *db.Repo, mq *mq.Client) (*Server, error) {
-	var appCfg = fiber.Config{
-		CaseSensitive: true,
-		StrictRouting: true,
-	}
-
-	app := fiber.New(appCfg)
-	app.Use(logger.New())
+	sessionMgr.Lifetime = 24 * time.Hour
+	oauthSrv := InitOauthServer(repo)
 
 	srv := &Server{
-		repo: repo,
-		app:  app,
-		mq:   mq,
+		repo:  repo,
+		mq:    mq,
+		oauth: oauthSrv,
+		mux:   http.NewServeMux(),
 	}
 
 	srv.initRoutes()
@@ -38,23 +41,22 @@ func NewServer(repo *db.Repo, mq *mq.Client) (*Server, error) {
 }
 
 func (s Server) Run() error {
-	if err := s.app.Listen(listenAddr); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s Server) Shutdown() error {
-	return s.app.Shutdown()
+	log.Printf("server is running on %s\n", listenAddr)
+	return http.ListenAndServe(listenAddr, sessionMgr.LoadAndSave(s.mux))
 }
 
 func (s Server) initRoutes() {
-	base := s.app.Group(baseURL)
-	base.Get("/ping", s.ping)
+	s.mux.HandleFunc("/ping", s.pingHandler)
+	s.mux.HandleFunc("/create-user/", s.createUser)
+	s.mux.HandleFunc("/get-user/", s.getUser)
+	s.mux.HandleFunc("/get-users/", s.getAllUsera)
+	s.mux.HandleFunc("/update-user/", s.updateUser)
+	s.mux.HandleFunc("/delete-user/", s.deleteUser)
 
-	base.Post("/users", s.createUser)
-	base.Get("/users", s.getAllUsers)
-	base.Get("/users/:id", s.getUser)
-	base.Patch("/users/:id", s.updateUser)
-	base.Delete("/users/:id", s.deleteUser)
+	s.mux.HandleFunc("/login", s.loginUser)
+
+	s.mux.HandleFunc("/oauth/authorization-grant", s.authorizationGrant)
+	s.mux.HandleFunc("/oauth/authorize", s.authorize)
+	s.mux.HandleFunc("/oauth/get-token", s.getToken)
+	s.mux.HandleFunc("/oauth/validate-token", s.validateToken)
 }

@@ -17,6 +17,10 @@ type (
 		ID       string `json:"id"`
 		Username string `json:"username"`
 	}
+	TokenClaims struct {
+		UUID string `json:"user_uuid"`
+		Role string `json:"user_role"`
+	}
 	Task struct {
 		ID          string    `json:"id"`
 		Title       string    `json:"title"`
