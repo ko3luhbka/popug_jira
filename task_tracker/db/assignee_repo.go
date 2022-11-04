@@ -16,6 +16,7 @@ type (
 	Assignee struct {
 		ID       string `db:"id"`
 		Username string `db:"username"`
+		Role string `db:"role"`
 	}
 )
 

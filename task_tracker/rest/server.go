@@ -59,7 +59,7 @@ func (s Server) initRoutes() {
 
 	tasks := base.Group("tasks")
 	tasks.Post("/", s.createTask)
-	tasks.Get("/", s.getAllTasks)
+	tasks.Get("/", adminOnly, s.getAllTasks)
 	tasks.Get("/:id", s.getTask)
 	tasks.Patch("/:id", s.updateTask)
 	tasks.Delete("/:id", s.deleteTask)
