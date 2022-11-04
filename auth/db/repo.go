@@ -68,7 +68,6 @@ func (r *Repo) GetByID(ctx context.Context, uuid string) (*User, error) {
 	err := r.db.GetContext(
 		ctx, &u, `
 		SELECT  id,
-				id,
 				username,
 				role,
 				email,
@@ -83,12 +82,31 @@ func (r *Repo) GetByID(ctx context.Context, uuid string) (*User, error) {
 	return &u, nil
 }
 
+func (r *Repo) GetByName(ctx context.Context, name string) (*User, error) {
+	var u User
+	err := r.db.GetContext(
+		ctx, &u, `
+		SELECT  id,
+				username,
+				password,
+				role,
+				email,
+				last_modified
+		FROM "user"
+		WHERE username=$1`, name,
+	)
+	if err != nil {
+		log.Printf("failed to get user with username %s: %v\n", name, err)
+		return nil, err
+	}
+	return &u, nil
+}
+
 func (r *Repo) GetAll(ctx context.Context) ([]User, error) {
 	var users []User
 	err := r.db.SelectContext(
 		ctx, &users, `
 		SELECT 	id,
-				id,
 				username,
 				role,
 				email,

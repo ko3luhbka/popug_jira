@@ -64,3 +64,13 @@ func (u *User) Validate() error {
 	}
 	return nil
 }
+
+func (u *UserLogin) Validate() error {
+	if u.Username == "" {
+		return fmt.Errorf("username field is empty")
+	}
+	if u.Password == "" {
+		return fmt.Errorf("password field is empty")
+	}
+	return nil
+}
